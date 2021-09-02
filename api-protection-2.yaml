@@ -1,0 +1,37 @@
+# =====================================================================================================
+# Use-case 2:
+# Extending access to the API for external news writers
+# =====================================================================================================
+apiVersion: authorino.3scale.net/v1beta1
+kind: AuthConfig
+metadata:
+  name: news-api-protection
+spec:
+  hosts:
+    - news-api:8000
+    - news-api.apps.mycluster.example.local
+  identity:
+    - name: teammates
+      kubernetes:
+        audiences: ["https://kubernetes.default.svc"]
+    - name: service-accounts
+      kubernetes: {}
+    - name: external-writers
+      apiKey:
+        labelSelectors:
+          authorino.3scale.net/managed-by: authorino
+          svc: news-api
+      credentials:
+        in: authorization_header
+        keySelector: API-KEY
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: external-news-writer-1
+  labels:
+    authorino.3scale.net/managed-by: authorino
+    svc: news-api
+type: Opaque
+stringData:
+  api_key: tY8TLYXlzflBI3utXLg7rGZsuS48NXG9sJwswG0mg0

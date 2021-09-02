@@ -1,0 +1,17 @@
+spec:
+  template:
+    spec:
+      containers:
+      - name: manager
+        volumeMounts:
+        - name: keycloak-cert
+          mountPath: /etc/ssl/certs/keycloak.crt
+          subPath: dev-eng-ocp4-8.pem
+          readOnly: false
+      volumes:
+      - name: keycloak-cert
+        # secret:
+        #   defaultMode: 420
+        #   secretName: sso-x509-https-secret
+        configMap:
+          name: ca-pemstore-dev-eng-ocp4-8

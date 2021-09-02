@@ -1,0 +1,18 @@
+# =====================================================================================================
+# Use-case 1:
+# Sharing access to the API with Kubernetes Service Accounts
+# =====================================================================================================
+apiVersion: authorino.3scale.net/v1beta1
+kind: AuthConfig
+metadata:
+  name: news-api-protection
+spec:
+  hosts:
+    - news-api:8000
+    - news-api.apps.mycluster.example.local
+  identity:
+    - name: teammates
+      kubernetes:
+        audiences: ["https://kubernetes.default.svc"]
+    - name: service-accounts
+      kubernetes: {}

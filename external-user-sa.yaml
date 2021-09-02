@@ -1,0 +1,19 @@
+# So we have something that represents a user that can consume the API from the outside.
+# Teammates who authenticate to the cluster API with bearer access tokens can use those instead.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: external-user-sa
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: token-requester-permission
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+- kind: ServiceAccount
+  name: external-user-sa
+  namespace: authorino-demo

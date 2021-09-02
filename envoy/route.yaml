@@ -1,0 +1,19 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: news-api
+  labels:
+    app: news-api
+spec:
+  host: news-api.apps.mycluster.example.local
+  to:
+    kind: Service
+    name: news-api
+    weight: null
+  port:
+    targetPort: envoy
+  tls:
+    insecureEdgeTerminationPolicy: Allow
+    termination: edge
+status:
+  ingress: null

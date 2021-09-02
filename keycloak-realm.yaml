@@ -1,0 +1,19 @@
+apiVersion: keycloak.org/v1alpha1
+kind: KeycloakRealm
+metadata:
+  name: news-agency
+  labels:
+    realm: news-agency
+spec:
+  realm:
+    realm: "news-agency"
+    enabled: True
+    displayName: "News Agency"
+    roles:
+      realm:
+      - name: reader
+      - name: writer
+      - name: admin
+  instanceSelector:
+    matchLabels:
+      app: keycloak

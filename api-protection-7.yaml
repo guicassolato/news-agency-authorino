@@ -1,0 +1,197 @@
+# =====================================================================================================
+# Use-case 7:
+# Rate-limiting based on the user's ID
+# =====================================================================================================
+apiVersion: authorino.3scale.net/v1beta1
+kind: AuthConfig
+metadata:
+  name: news-api-protection
+spec:
+  hosts:
+    - news-api:8000
+    - news-api.apps.mycluster.example.local
+  identity:
+    - name: teammates
+      kubernetes:
+        audiences: ["https://kubernetes.default.svc"]
+      extendedProperties:
+        - name: sub
+          valueFrom:
+            authJSON: auth.identity.uid
+        - name: name
+          valueFrom:
+            authJSON: auth.identity.username
+        - name: roles
+          value: ["admin"]
+    - name: service-accounts
+      kubernetes: {}
+      extendedProperties:
+        - name: name
+          valueFrom:
+            authJSON: auth.identity.serviceaccount.name
+        - name: roles
+          value: ["reader"]
+    - name: external-writers
+      apiKey:
+        labelSelectors:
+          authorino.3scale.net/managed-by: authorino
+          svc: news-api
+      credentials:
+        in: authorization_header
+        keySelector: API-KEY
+      extendedProperties:
+        - name: sub
+          valueFrom:
+            authJSON: auth.identity.metadata.name
+        - name: name
+          valueFrom:
+            authJSON: auth.identity.metadata.annotations.news-agency/author-name
+        - name: roles
+          value: ["reader", "writer"]
+    - name: idp-users
+      oidc:
+        endpoint: https://keycloak-authorino-demo.apps.mycluster.example.local/auth/realms/news-agency
+      extendedProperties:
+        - name: roles
+          valueFrom:
+            authJSON: auth.identity.realm_access.roles
+    - name: wristband
+      oidc:
+        endpoint: https://authorino-oidc.authorino-demo.svc:8083/authorino-demo/news-api-protection/wristband
+  metadata:
+    - name: geolocation
+      http:
+        # endpoint: https://www.iplocate.io/api/lookup/{context.request.http.headers.x-forwarded-for}
+        endpoint: http://ip-api.com/json/{context.request.http.headers.x-forwarded-for}?fields=query,country,continent
+        method: GET
+  authorization:
+    - name: rbac
+      opa:
+        inlineRego: |
+          roles := input.auth.identity.roles
+          method := input.context.request.http.method
+
+          allow { method == "GET";  roles[_] == "reader" }
+          allow { method == "POST"; roles[_] == "writer" }
+          allow { roles[_] == "admin" }
+    - name: geofence
+      json:
+        conditions:
+          - selector: auth.identity.roles
+            operator: excl
+            value: "admin"
+          - selector: context.request.http.path
+            operator: matches
+            value: "/sports(/(\\w|-)*)?$"
+        rules:
+          - selector: auth.metadata.geolocation.country
+            operator: neq
+            value: Spain
+  response:
+    - name: wristband
+      wrapperKey: x-ext-auth-wristband
+      wristband:
+        issuer: https://authorino-oidc.authorino-demo.svc:8083/authorino-demo/news-api-protection/wristband
+        customClaims:
+          - name: sub
+            valueFrom:
+              authJSON: auth.identity.sub
+          - name: name
+            valueFrom:
+              authJSON: auth.identity.name
+          - name: roles
+            valueFrom:
+              authJSON: auth.identity.roles
+        tokenDuration: 3600 # 1h
+        signingKeyRefs:
+          - name: my-signing-key
+            algorithm: ES256
+    - name: rate-limit
+      wrapper: envoyDynamicMetadata
+      json:
+        properties:
+          - name: user_id
+            valueFrom:
+              authJSON: auth.identity.sub
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: external-news-writer-1
+  labels:
+    authorino.3scale.net/managed-by: authorino
+    svc: news-api
+  annotations:
+    news-agency/author-name: Peter Parker
+type: Opaque
+stringData:
+  api_key: tY8TLYXlzflBI3utXLg7rGZsuS48NXG9sJwswG0mg0
+---
+apiVersion: keycloak.org/v1alpha1
+kind: KeycloakUser
+metadata:
+  name: john
+spec:
+  user:
+    username: "john"
+    firstName: "John"
+    lastName: "Doe"
+    email: "john@news-agency.demo"
+    credentials:
+    - temporary: false
+      type: password
+      value: "p"
+    enabled: true
+    emailVerified: true
+    realmRoles:
+      - "offline_access"
+      - "reader"
+    clientRoles:
+      account:
+        - "manage-account"
+      realm-management:
+        - "manage-users"
+  realmSelector:
+    matchLabels:
+      realm: news-agency
+---
+apiVersion: keycloak.org/v1alpha1
+kind: KeycloakUser
+metadata:
+  name: jane
+spec:
+  user:
+    username: "jane"
+    firstName: "Jane"
+    lastName: "Smith"
+    email: "jane@news-agency.demo"
+    credentials:
+    - temporary: false
+      type: password
+      value: "p"
+    enabled: true
+    emailVerified: true
+    realmRoles:
+      - "offline_access"
+      - "admin"
+    clientRoles:
+      account:
+        - "manage-account"
+      realm-management:
+        - "manage-users"
+  realmSelector:
+    matchLabels:
+      realm: news-agency
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: my-signing-key
+stringData:
+  key.pem: |
+    -----BEGIN EC PRIVATE KEY-----
+    MHcCAQEEIDHvuf81gVlWGo0hmXGTAnA/HVxGuH8vOc7/8jewcVvqoAoGCCqGSM49
+    AwEHoUQDQgAETJf5NLVKplSYp95TOfhVPqvxvEibRyjrUZwwtpDuQZxJKDysoGwn
+    cnUvHIu23SgW+Ee9lxSmZGhO4eTdQeKxMA==
+    -----END EC PRIVATE KEY-----
+type: Opaque

@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: readers-ui
+  labels:
+    app: readers-ui
+spec:
+  selector:
+    matchLabels:
+      app: readers-ui
+  template:
+    metadata:
+      labels:
+        app: readers-ui
+    spec:
+      containers:
+      - name: webapp
+        image: quay.io/guicassolato/authorino:readers-ui
+        imagePullPolicy: Always
+        env:
+        - name: ENDPOINT
+          value: https://readers-ui.apps.mycluster.example.local
+        - name: NEWS_API_ENDPOINT
+          value: https://news-api.apps.mycluster.example.local
+        - name: KEYCLOAK_REALM
+          value: https://keycloak-authorino-demo.apps.mycluster.example.local/auth/realms/news-agency
+        - name: CLIENT_ID
+          value: readers-ui
+        - name: CLIENT_SECRET
+          value: ca24403c-fd8a-4463-a754-52730c70a823
+        - name: NODE_TLS_REJECT_UNAUTHORIZED
+          value: "0"
+  replicas: 1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: readers-ui
+spec:
+  selector:
+    app: readers-ui
+  ports:
+    - name: server
+      port: 8888
+      protocol: TCP
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  creationTimestamp: null
+  labels:
+    app: readers-ui
+  name: readers-ui
+spec:
+  host: readers-ui.apps.mycluster.example.local
+  to:
+    kind: Service
+    name: readers-ui
+    weight: null
+  port:
+    targetPort: 8888
+  tls:
+    insecureEdgeTerminationPolicy: Allow
+    termination: edge
+status:
+  ingress: null

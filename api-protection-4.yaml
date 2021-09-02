@@ -1,0 +1,99 @@
+# =====================================================================================================
+# Use-case 4:
+# Opening up the API to federated users
+# =====================================================================================================
+apiVersion: authorino.3scale.net/v1beta1
+kind: AuthConfig
+metadata:
+  name: news-api-protection
+spec:
+  hosts:
+    - news-api:8000
+    - news-api.apps.mycluster.example.local
+  identity:
+    - name: teammates
+      kubernetes:
+        audiences: ["https://kubernetes.default.svc"]
+    - name: service-accounts
+      kubernetes: {}
+    - name: external-writers
+      apiKey:
+        labelSelectors:
+          authorino.3scale.net/managed-by: authorino
+          svc: news-api
+      credentials:
+        in: authorization_header
+        keySelector: API-KEY
+    - name: idp-users
+      oidc:
+        endpoint: https://keycloak-authorino-demo.apps.mycluster.example.local/auth/realms/news-agency
+  authorization:
+    - name: sas-can-only-read
+      json:
+        conditions:
+          - selector: auth.identity.iss # openshift access tokens are not JWTs, so the identity is the user info which does not include `iss`
+            operator: eq
+            value: https://kubernetes.default.svc.cluster.local
+        rules:
+          - selector: context.request.http.method
+            operator: eq
+            value: GET
+    - name: external-writers-cannot-delete
+      json:
+        conditions:
+          - selector: auth.identity.kind
+            operator: eq
+            value: Secret
+        rules:
+          - selector: context.request.http.method
+            operator: neq
+            value: DELETE
+    - name: idp-users-can-only-read
+      json:
+        conditions:
+          - selector: auth.identity.iss
+            operator: eq
+            value: https://keycloak-authorino-demo.apps.mycluster.example.local/auth/realms/news-agency
+        rules:
+          - selector: context.request.http.method
+            operator: eq
+            value: GET
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: external-news-writer-1
+  labels:
+    authorino.3scale.net/managed-by: authorino
+    svc: news-api
+type: Opaque
+stringData:
+  api_key: tY8TLYXlzflBI3utXLg7rGZsuS48NXG9sJwswG0mg0
+---
+apiVersion: keycloak.org/v1alpha1
+kind: KeycloakUser
+metadata:
+  name: john
+spec:
+  user:
+    username: "john"
+    firstName: "John"
+    lastName: "Doe"
+    email: "john@news-agency.demo"
+    credentials:
+    - temporary: false
+      type: password
+      value: "p"
+    enabled: true
+    emailVerified: true
+    realmRoles:
+      - "offline_access"
+      - "reader"
+    clientRoles:
+      account:
+        - "manage-account"
+      realm-management:
+        - "manage-users"
+  realmSelector:
+    matchLabels:
+      realm: news-agency

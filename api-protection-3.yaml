@@ -1,0 +1,58 @@
+# =====================================================================================================
+# Use-case 3:
+# Service accounts can only READ and LIST, external writers cannot DELETE
+# =====================================================================================================
+apiVersion: authorino.3scale.net/v1beta1
+kind: AuthConfig
+metadata:
+  name: news-api-protection
+spec:
+  hosts:
+    - news-api:8000
+    - news-api.apps.mycluster.example.local
+  identity:
+    - name: teammates
+      kubernetes:
+        audiences: ["https://kubernetes.default.svc"]
+    - name: service-accounts
+      kubernetes: {}
+    - name: external-writers
+      apiKey:
+        labelSelectors:
+          authorino.3scale.net/managed-by: authorino
+          svc: news-api
+      credentials:
+        in: authorization_header
+        keySelector: API-KEY
+  authorization:
+    - name: sas-can-only-read
+      json:
+        conditions:
+          - selector: auth.identity.iss # openshift access tokens are not JWTs, so the identity is the user info which does not include `iss`
+            operator: eq
+            value: https://kubernetes.default.svc.cluster.local
+        rules:
+          - selector: context.request.http.method
+            operator: eq
+            value: GET
+    - name: external-writers-cannot-delete
+      json:
+        conditions:
+          - selector: auth.identity.kind
+            operator: eq
+            value: Secret
+        rules:
+          - selector: context.request.http.method
+            operator: neq
+            value: DELETE
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: external-news-writer-1
+  labels:
+    authorino.3scale.net/managed-by: authorino
+    svc: news-api
+type: Opaque
+stringData:
+  api_key: tY8TLYXlzflBI3utXLg7rGZsuS48NXG9sJwswG0mg0

@@ -1,0 +1,21 @@
+apiVersion: keycloak.org/v1alpha1
+kind: KeycloakClient
+metadata:
+  name: readers-ui
+  labels:
+    realm: news-agency
+spec:
+  client:
+    clientId: readers-ui
+    publicClient: false
+    secret: ca24403c-fd8a-4463-a754-52730c70a823
+    rootUrl: https://readers-ui.apps.mycluster.example.local
+    redirectUris:
+    - https://readers-ui.apps.mycluster.example.local/auth
+    standardFlowEnabled: true
+    defaultClientScopes:
+    - profile
+    - roles
+  realmSelector:
+    matchLabels:
+      realm: news-agency

@@ -1,0 +1,34 @@
+spec:
+  template:
+    spec:
+      containers:
+      - name: envoy
+        image: envoyproxy/envoy:v1.19-latest
+        command:
+        - /usr/local/bin/envoy
+        args:
+        - --config-path /usr/local/etc/envoy/envoy.yaml
+        - --service-cluster front-proxy
+        - --log-level info
+        - --component-log-level filter:trace,http:debug,router:debug
+        ports:
+        - containerPort: 8000
+        volumeMounts:
+        - mountPath: /etc/ssl/certs/authorino-ca-cert.crt
+          name: authorino-ca-cert
+          readOnly: true
+          subPath: ca.crt
+        - mountPath: /usr/local/etc/envoy
+          name: config
+          readOnly: true
+      volumes:
+      - name: authorino-ca-cert
+        secret:
+          defaultMode: 420
+          secretName: authorino-ca-cert
+      - configMap:
+          items:
+          - key: envoy.yaml
+            path: envoy.yaml
+          name: envoy
+        name: config

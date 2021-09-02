@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reader-bot
+  labels:
+    app: reader-bot
+spec:
+  selector:
+    matchLabels:
+      app: reader-bot
+  template:
+    metadata:
+      labels:
+        app: reader-bot
+    spec:
+      containers:
+      - name: reader-bot
+        image: quay.io/guicassolato/authorino:reader-bot
+        imagePullPolicy: Always
+        env:
+        - name: NEWS_API_URL
+          value: http://news-api:8000
+        - name: ACCESS_TOKEN_PATH
+          value: /var/run/secrets/tokens/reader-bot-token
+        - name: CATEGORIES
+          value: "sports,business,economy,society,entertainment,tech"
+        tty: true
+        volumeMounts:
+        - name: access-tokens
+          mountPath: /var/run/secrets/tokens
+      serviceAccountName: reader-bot-sa
+      volumes:
+      - name: access-tokens
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: reader-bot-token
+              expirationSeconds: 7200
+              audience: news-api:8000
+  replicas: 1
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: reader-bot-sa
+automountServiceAccountToken: false
