@@ -115,6 +115,12 @@ Fix the OpenShift domain, e.g.:
 ag -l apps.mycluster.example.local | xargs sed -i 's/apps.mycluster.example.local/<your-actual-openshift-apps-domain>/g'
 ```
 
+You may as well want to export the OpenShift domain to your shell, in case you are copy/pasting example commands from this tutorial into your terminal, e.g.:
+
+```sh
+export OPENSHIFT_DOMAIN=mycluster.example.local # without the 'apps.' or 'api.' labels
+```
+
 Logged in to the OpenShift cluster in the terminal, using the CLI, create the namespace:
 
 ```sh
@@ -164,7 +170,7 @@ With that, we should be able to try sending traffic to the API. However, we have
 For example, we can send a request to the API asking for the list of news articles in the “sports” category:
 
 ```sh
-curl -k https://news-api.apps.mycluster.example.local/sports -i
+curl -k https://news-api.apps.$OPENSHIFT_DOMAIN/sports -i
 # HTTP/1.1 404 Not Found
 # x-ext-auth-reason: Service not found
 ```
@@ -190,7 +196,7 @@ Let us then tell Authorino about the News API…
   Try sending another request to the API:
 
   ```sh
-  curl -k https://news-api.apps.mycluster.example.local/sports -i
+  curl -k https://news-api.apps.$OPENSHIFT_DOMAIN/sports -i
   # HTTP/1.1 401 Unauthorized
   # www-authenticate: Bearer realm="teammates"
   # www-authenticate: Bearer realm="service-accounts"
@@ -208,14 +214,14 @@ Let us then tell Authorino about the News API…
   Now, yes, we can send a request to the API again:
 
   ```sh
-  curl -k -H "Authorization: $AUTHENTICATION" https://news-api.apps.mycluster.example.local/sports
+  curl -k -H "Authorization: $AUTHENTICATION" https://news-api.apps.$OPENSHIFT_DOMAIN/sports
   # []
   ```
 
   The reason why this works is because, when we use OpenShift user access token to authenticate, Authorino issues a request to the Kubernetes API to get this token reviewed. Authorino gets an information similar to the `metadata` of the response you get when run you this:
 
   ```sh
-  curl -k -H "Authorization: $AUTHENTICATION" "https://api.mycluster.example.local:6443/apis/user.openshift.io/v1/users/~"
+  curl -k -H "Authorization: $AUTHENTICATION" "https://api.$OPENSHIFT_DOMAIN:6443/apis/user.openshift.io/v1/users/~"
   ```
 
   It actually does more than that. It explicitly verifies if the token is for the required “audience”. This audience, by the way, is very permissive. We probably do not want to work with that in production, at least not without combining this authentication mode with a more restrictive authorization policy.
@@ -247,7 +253,7 @@ Let us then tell Authorino about the News API…
   From outside the cluster we have that OpenShift user access token that allowed us to consume the News API impersonating that user. Let’s use that to create an article:
 
   ```sh
-  curl -k -H "Authorization: $AUTHENTICATION" -X POST -d '{"title":"Facebook shut down political ad research, daring authorities to pursue regulation","body":"On Tuesday, Facebook stopped a team of researchers from New York University from studying political ads and COVID-19 misinformation by blocking their personal accounts, pages, apps, and access to its platform. The move was meant to stop NYU’s Ad Observatory from using a browser add-on it launched in 2020 to collect data about the political ads users see on Facebook. (By Christianna Silva)"}' https://news-api.apps.mycluster.example.local/tech
+  curl -k -H "Authorization: $AUTHENTICATION" -X POST -d '{"title":"Facebook shut down political ad research, daring authorities to pursue regulation","body":"On Tuesday, Facebook stopped a team of researchers from New York University from studying political ads and COVID-19 misinformation by blocking their personal accounts, pages, apps, and access to its platform. The move was meant to stop NYU’s Ad Observatory from using a browser add-on it launched in 2020 to collect data about the political ads users see on Facebook. (By Christianna Silva)"}' https://news-api.apps.$OPENSHIFT_DOMAIN/tech
   ```
 </details>
 
@@ -269,7 +275,7 @@ Let us then tell Authorino about the News API…
   ```sh
   AUTHENTICATION="API-KEY $(kubectl -n authorino-demo get secret/external-news-writer-1 -o json | jq -r .data.api_key | base64 -d)"
 
-  curl -k -H "Authorization: $AUTHENTICATION" -X POST -d '{"title":"Murder, abuse charges against California foster parents","body":"RIVERSIDE, Calif. (AP) — A Southern California woman who ran a now-shuttered foster home for severely disabled children has been charged with murder and other felonies while her husband faces charges including lewd conduct and willful harm to a child, prosecutors said. (By Associated Press)"}' https://news-api.apps.mycluster.example.local/society
+  curl -k -H "Authorization: $AUTHENTICATION" -X POST -d '{"title":"Murder, abuse charges against California foster parents","body":"RIVERSIDE, Calif. (AP) — A Southern California woman who ran a now-shuttered foster home for severely disabled children has been charged with murder and other felonies while her husband faces charges including lewd conduct and willful harm to a child, prosecutors said. (By Associated Press)"}' https://news-api.apps.$OPENSHIFT_DOMAIN/society
   ```
 </details>
 
@@ -293,7 +299,7 @@ Let us then tell Authorino about the News API…
   _Tip:_ use the ID of news article returned in the response of the last command of the previous use-case, or send a GET request to `/society` to get one.
 
   ```sh
-  curl -k -H "Authorization: $AUTHENTICATION" -X DELETE https://news-api.apps.mycluster.example.local/society/{id} -i
+  curl -k -H "Authorization: $AUTHENTICATION" -X DELETE https://news-api.apps.$OPENSHIFT_DOMAIN/society/{id} -i
   # HTTP/1.1 403 Forbidden
   # x-ext-auth-reason: Unauthorized
   ```
@@ -307,7 +313,7 @@ Let us then tell Authorino about the News API…
   ...is that we are authorized to delete the article:
 
   ```sh
-  curl -k -H "Authorization: $AUTHENTICATION" -X DELETE https://news-api.apps.mycluster.example.local/society/{id}
+  curl -k -H "Authorization: $AUTHENTICATION" -X DELETE https://news-api.apps.$OPENSHIFT_DOMAIN/society/{id}
   ```
 </details>
 
@@ -366,11 +372,11 @@ Let us then tell Authorino about the News API…
   # keycloakuser.keycloak.org/john created
   ```
 
-  The manifests includes a Keycloak user named John, that we can authenticate with (username: 'john', password: 'p'). Let’s do that starting by opening the Readers UI in the browser: https://readers-ui.apps.mycluster.example.local.
+  The manifests includes a Keycloak user named John, that we can authenticate with (username: 'john', password: 'p'). Let’s do that starting by opening the Readers UI in the browser: https://readers-ui.apps.$OPENSHIFT_DOMAIN.
 
   We may want to add an exception in the browser for the OpenShift-issued TLS certificate of the external route for the News API. In our requests using curl, we’ve been bypassing server certificate validation, if you noticed.
 
-  In another browser tab, open https://news-api.apps.mycluster.example.local.
+  In another browser tab, open https://news-api.apps.$OPENSHIFT_DOMAIN.
 
   > Note: In production, you shouldn't expect to have this problem, of course, Instead, we recommend favouring properly issued TLS server certificates, signed by well-known certificate authorities.
 
@@ -404,7 +410,7 @@ Let us then tell Authorino about the News API…
   ```sh
   AUTHENTICATION="API-KEY $(kubectl -n authorino-demo get secret/external-news-writer-1 -o json | jq -r .data.api_key | base64 -d)"
 
-  curl -k -H "Authorization: $AUTHENTICATION" https://news-api.apps.mycluster.example.local/tech -i
+  curl -k -H "Authorization: $AUTHENTICATION" https://news-api.apps.$OPENSHIFT_DOMAIN/tech -i
   # HTTP/1.1 200 OK
   # content-type: application/json
   # x-ext-auth-wristband: "<wristband>"
@@ -419,7 +425,7 @@ Let us then tell Authorino about the News API…
   Create an article, now using the wristband to authenticate:
 
   ```sh
-  curl -k -H "Authorization: $AUTHENTICATION" -X POST -d '{"title":"Lionel Messi leaving Barcelona after ‘obstacles’ thwart contract renewal","body":"Barcelona have announced that Lionel Messi is leaving the club after “financial and structural obstacles” made it impossible to renew his contract. The forward, who has spent his whole career there, had been expected to re-sign after his deal expired in June. (By David Hytner)"}' https://news-api.apps.mycluster.example.local/sports
+  curl -k -H "Authorization: $AUTHENTICATION" -X POST -d '{"title":"Lionel Messi leaving Barcelona after ‘obstacles’ thwart contract renewal","body":"Barcelona have announced that Lionel Messi is leaving the club after “financial and structural obstacles” made it impossible to renew his contract. The forward, who has spent his whole career there, had been expected to re-sign after his deal expired in June. (By David Hytner)"}' https://news-api.apps.$OPENSHIFT_DOMAIN/sports
   # HTTP/1.1 200 OK
   # content-type: application/json
   ```
